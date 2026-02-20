@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CSE Tracker">
+<meta name="theme-color" content="#fafaf8">
+<title>CSE Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fafaf8; --surface: #ffffff;
+  --border: rgba(0,0,0,.06); --border-hover: rgba(0,0,0,.1);
+  --text: #1a1a1a; --text-2: #555; --text-3: #999;
+  --ink: #0d0d0d;
+  --accent: #5046e5; --accent-light: #ede9fe;
+  --emerald: #059669; --emerald-bg: #ecfdf5;
+  --amber: #d97706; --amber-bg: #fffbeb;
+  --rose: #e11d48; --rose-bg: #fff1f2;
+  --violet: #7c3aed; --violet-bg: #f5f3ff;
+  --sky: #0284c7; --sky-bg: #f0f9ff;
+  --r: 14px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  min-height:100dvh; background:var(--bg);
+  color:var(--text); font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background:rgba(250,250,248,.72); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:14px 18px 12px; position:sticky; top:0; z-index:100;
+}
+.top-row { display:flex; align-items:center; justify-content:space-between; }
+.brand { display:flex; align-items:center; gap:10px; }
+.brand-mark {
+  width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(145deg,#5046e5,#7c3aed);
+  font-size:15px; font-weight:800; color:#fff; letter-spacing:-.5px;
+  box-shadow:0 2px 10px rgba(80,70,229,.35);
+}
+.brand-name { font-size:17px; font-weight:800; color:var(--ink); letter-spacing:-.4px; }
+.brand-sub { font-size:10px; color:var(--text-3); font-weight:600; letter-spacing:.3px; }
+.btn-sync {
+  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  background:var(--surface); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .15s; font-size:16px;
+}
+.btn-sync:active { transform:scale(.9); background:var(--bg); }
+.btn-sync.spinning svg { animation:spin .8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ── Search ── */
+.search-area { margin-top:12px; position:relative; }
+.search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-3); margin-top:6px; }
+.search-icon svg { width:15px; height:15px; stroke-width:2.5; }
+#search-box {
+  width:100%; background:var(--bg); border:1.5px solid var(--border);
+  border-radius:12px; padding:11px 14px 11px 38px;
+  color:var(--text); font-size:15px; font-weight:500; outline:none;
+  font-family:'Plus Jakarta Sans'; transition:all .2s;
+}
+#search-box:focus { border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(80,70,229,.1); }
+#search-box::placeholder { color:#bbb; font-weight:400; }
+
+/* ── Chips ── */
+.chips { display:flex; gap:7px; margin-top:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.chips::-webkit-scrollbar { display:none; }
+.chip {
+  padding:7px 14px; border-radius:50px; font-size:13px; font-weight:600; cursor:pointer;
+  font-family:'Plus Jakarta Sans'; background:var(--surface); color:var(--text-2);
+  border:1.5px solid var(--border); white-space:nowrap; flex-shrink:0;
+  transition:all .2s ease; position:relative;
+}
+.chip:active { transform:scale(.95); }
+.chip.on {
+  background:var(--ink); color:#fff; border-color:var(--ink);
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+.chip-count { font-size:11px; opacity:.6; margin-left:2px; }
+
+/* ── Content ── */
+.count { padding:14px 18px 6px; font-size:12px; color:var(--text-3); font-weight:600; letter-spacing:.3px; }
+.feed { padding:4px 14px 110px; }
+
+/* ── Card ── */
+.item {
+  background:var(--surface); border:1.5px solid var(--border);
+  border-radius:var(--r); padding:16px 18px; margin-bottom:10px;
+  cursor:pointer; transition:all .2s ease;
+  position:relative; overflow:hidden;
+}
+.item::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:transparent; transition:background .2s;
+}
+.item:active { transform:scale(.985); }
+.item.open {
+  border-color:var(--accent);
+  box-shadow:0 8px 30px rgba(80,70,229,.08);
+}
+.item.open::before { background:linear-gradient(90deg,#5046e5,#7c3aed); }
+
+.item-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.tag {
+  padding:3px 9px; border-radius:6px; font-size:10.5px; font-weight:700;
+  letter-spacing:.3px; text-transform:uppercase;
+}
+.item-date { font-size:11px; color:var(--text-3); font-weight:500; white-space:nowrap; margin-top:2px; }
+.item-company {
+  font-size:15.5px; font-weight:700; color:var(--ink); letter-spacing:-.2px;
+  margin-bottom:3px; line-height:1.3;
+}
+.item-summary {
+  font-size:13.5px; color:var(--text-2); line-height:1.6;
+  overflow:hidden; transition:max-height .25s ease;
+}
+.item-summary.clamp { max-height:42px; }
+
+.item-detail {
+  margin-top:14px; padding-top:14px;
+  border-top:1px solid rgba(0,0,0,.05);
+  animation:reveal .25s ease;
+}
+@keyframes reveal { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+.item-desc { font-size:12px; color:var(--text-3); margin-bottom:10px; line-height:1.5; }
+.item-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.item-time {
+  font-family:'Space Mono',monospace; font-size:11px; color:var(--text-3);
+  background:var(--bg); padding:5px 10px; border-radius:8px; font-weight:400;
+}
+.pdf-btn {
+  background:linear-gradient(145deg,#5046e5,#6d5ffa); color:#fff;
+  padding:10px 22px; border-radius:12px; font-size:13px; font-weight:700;
+  text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+  font-family:'Plus Jakarta Sans'; letter-spacing:-.1px;
+  box-shadow:0 3px 12px rgba(80,70,229,.3);
+  transition:all .15s;
+}
+.pdf-btn:active { transform:scale(.95); box-shadow:0 1px 6px rgba(80,70,229,.2); }
+
+/* ── States ── */
+.empty { text-align:center; padding:60px 20px; }
+.empty-emoji { font-size:48px; margin-bottom:10px; }
+.empty-text { font-size:15px; color:var(--text-3); font-weight:500; }
+.err { margin:14px; padding:16px; background:var(--rose-bg); border-radius:12px; border:1px solid #fecaca; font-size:13px; color:var(--rose); }
+.err small { display:block; margin-top:4px; opacity:.7; }
+.load { text-align:center; padding:80px 20px; }
+.dots { display:flex; justify-content:center; gap:6px; margin-bottom:16px; }
+.dot { width:10px; height:10px; border-radius:50%; background:var(--accent); animation:pulse .8s ease infinite alternate; }
+.dot:nth-child(2) { animation-delay:.15s; opacity:.7; }
+.dot:nth-child(3) { animation-delay:.3s; opacity:.4; }
+@keyframes pulse { to{transform:scale(.5); opacity:.2} }
+.load-text { font-size:14px; color:var(--text-3); font-weight:500; }
+
+/* ── Bottom nav ── */
+.navbar {
+  position:fixed; bottom:0; left:0; right:0;
+  padding:0 10px 10px;
+  background:linear-gradient(180deg,transparent 0%,var(--bg) 50%);
+}
+.navbar-inner {
+  display:flex; justify-content:space-evenly;
+  background:rgba(255,255,255,.85); backdrop-filter:saturate(180%) blur(16px); -webkit-backdrop-filter:saturate(180%) blur(16px);
+  border-radius:20px; border:1px solid var(--border);
+  padding:6px 2px;
+  box-shadow:0 4px 24px rgba(0,0,0,.06);
+}
+.tab {
+  background:none; border:none; border-radius:14px;
+  padding:8px 18px; cursor:pointer; text-align:center;
+  font-family:'Plus Jakarta Sans'; transition:all .2s;
+  color:var(--text-3);
+}
+.tab:active { transform:scale(.92); }
+.tab.on { background:var(--accent-light); color:var(--accent); }
+.tab-icon { display:none; }
+.tab-num { font-size:15px; font-weight:800; color:var(--ink); margin-top:1px; }
+.tab.on .tab-num { color:var(--accent); }
+.tab-label { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; margin-top:1px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="top-row">
+    <div class="brand">
+      <div class="brand-mark">CS</div>
+      <div>
+        <div class="brand-name">CSE Tracker</div>
+        <div class="brand-sub" id="sub">Loading...</div>
+      </div>
+    </div>
+    <button class="btn-sync" id="syncBtn" onclick="fetchData()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+    </button>
+  </div>
+  <div class="search-area">
+    <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+    <input id="search-box" type="text" placeholder="Search company...">
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div id="main"></div>
+<div id="nav"></div>
+
+<script>
+const CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFnm5weSmdc4AkDCmN7HL1M5DGymv5N1MiJfSG3BFneRi-Cqj3dmfYWZINQGQjJ3ONFaBpCDk1NyEn/pub?output=csv";
+
+const G = {
+  "Dividends":     { e:"💰", m:s=>s.includes("CASH DIVIDEND") },
+  "Dealings":      { e:"🔄", m:s=>s.includes("DEALINGS BY DIRECTORS") },
+  "Rights Issue":  { e:"📈", m:s=>s.includes("RIGHTS ISSUE") },
+  "Restructuring": { e:"👥", m:s=>["APPOINTMENT","RESIGNATION","RETIREMENT","REMOVAL","DEATH"].some(k=>s.includes(k)) },
+  "Other":         { e:"📋", m:s=>true },
+};
+function grp(s) { s=(s||"").toUpperCase(); for(const[n,c]of Object.entries(G)){if(n!=="Other"&&c.m(s))return n} return "Other" }
+
+const B = {
+  "CASH DIVIDEND":["var(--emerald)","var(--emerald-bg)"],
+  "CORPORATE DISCLOSURE":["var(--sky)","var(--sky-bg)"],
+  "DEALINGS BY DIRECTORS":["var(--amber)","var(--amber-bg)"],
+  "APPOINTMENT":["var(--violet)","var(--violet-bg)"],
+  "RESIGNATION":["var(--rose)","var(--rose-bg)"],
+  "RETIREMENT":["var(--rose)","var(--rose-bg)"],
+  "RIGHTS ISSUE":["var(--sky)","var(--sky-bg)"],
+  "TRADING HALT":["var(--rose)","var(--rose-bg)"],
+  "EXTRAORDINARY":["var(--violet)","var(--violet-bg)"],
+  "DEBENTURE":["var(--sky)","var(--sky-bg)"],
+  "RATING":["var(--amber)","var(--amber-bg)"],
+  "WATCH":["var(--amber)","var(--amber-bg)"],
+  "CIRCULAR":["var(--sky)","var(--sky-bg)"],
+  "CLARIFICATION":["var(--amber)","var(--amber-bg)"],
+  "ERRATA":["var(--rose)","var(--rose-bg)"],
+};
+function badge(s) { for(const[k,v]of Object.entries(B)){if(s.includes(k))return v} return ["var(--text-3)","var(--bg)"] }
+
+function csv(t) {
+  const L=[]; let r=[],c="",q=false;
+  for(let i=0;i<t.length;i++){const x=t[i];if(x==='"'){if(q&&t[i+1]==='"'){c+='"';i++}else q=!q}else if(x===','&&!q){r.push(c);c=""}else if((x==='\n'||x==='\r')&&!q){if(c||r.length){r.push(c);L.push(r);r=[];c=""}if(x==='\r'&&t[i+1]==='\n')i++}else c+=x}
+  if(c||r.length){r.push(c);L.push(r)} return L;
+}
+function pdf(l) { if(!l)return null; const m=l.match(/HYPERLINK\("([^"]+)"/); if(m)return m[1]; if(l.startsWith("http"))return l; return null }
+
+let D=[],F=[],q="",sel="ALL",exp=null,ld=true,err=null,upd=null;
+document.getElementById("search-box").addEventListener("input",function(){q=this.value;go()});
+
+async function fetchData() {
+  const btn=document.getElementById("syncBtn"); btn.classList.add("spinning");
+  try {
+    ld=true; err=null; draw();
+    const r=await fetch(CSV); if(!r.ok)throw new Error("Failed to fetch");
+    const t=await r.text(); const L=csv(t); if(L.length<2)throw new Error("No data");
+    D=L.slice(1).filter(r=>r[2]).map((r,i)=>({
+      id:i,dt:r[0]||"",tm:r[1]||"",co:r[2]||"",
+      sj:r[3]||"",ds:r[4]||"",sm:r[5]||"",
+      pl:r[6]||"",pc:r[7]||"0",g:grp(r[3]||""),
+    }));
+    upd=new Date(); err=null;
+  } catch(e){err=e.message}
+  finally{ld=false; go(); btn.classList.remove("spinning")}
+}
+
+function go() {
+  F=D.filter(i=>{
+    if(sel!=="ALL"&&i.g!==sel)return false;
+    if(q){const s=q.toLowerCase();return i.co.toLowerCase().includes(s)||i.sm.toLowerCase().includes(s)||i.ds.toLowerCase().includes(s)}
+    return true;
+  });
+  chips(); draw(); tabs();
+  const s=document.getElementById("sub");
+  if(D.length)s.textContent=`${D.length} disclosures · updated ${upd?upd.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):""}`;
+}
+
+function gc(){const c={};D.forEach(d=>{c[d.g]=(c[d.g]||0)+1});return c}
+
+function chips() {
+  const c=gc();
+  document.getElementById("chips").innerHTML=
+    ["ALL","Dividends","Dealings","Rights Issue","Restructuring","Other"].map(g=>{
+      const on=sel===g; const n=g==="ALL"?D.length:c[g]||0;
+      const e=G[g]?G[g].e+" ":"";
+      return `<div class="chip${on?" on":""}" onclick="sel='${g}';go()">${g==="ALL"?"All":e+g}<span class="chip-count">${n}</span></div>`;
+    }).join("");
+}
+
+function draw() {
+  const el=document.getElementById("main");
+  if(err){el.innerHTML=`<div class="err">⚠️ ${err}<small>Publish sheet: File → Share → Publish to web → CSV</small></div>`;return}
+  if(ld&&!D.length){el.innerHTML=`<div class="load"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="load-text">Loading disclosures...</div></div>`;return}
+
+  let h=`<div class="count">${F.length} result${F.length!==1?"s":""}${q?' · "'+q+'"':""}${sel!=="ALL"?" · "+sel:""}</div><div class="feed">`;
+
+  F.forEach(i=>{
+    const o=exp===i.id; const p=pdf(i.pl);
+    const[bc,bg]=badge(i.sj);
+    const sj=i.sj.length>30?i.sj.slice(0,27)+"…":i.sj;
+    const sm=i.sm||i.ds||"—";
+
+    h+=`<div class="item${o?" open":""}" onclick="exp=${o?"null":i.id};draw()">`;
+    h+=`<div class="item-head"><span class="tag" style="background:${bg};color:${bc}">${sj}</span><span class="item-date">${i.dt}</span></div>`;
+    h+=`<div class="item-company">${i.co}</div>`;
+    h+=`<div class="item-summary${o?"":" clamp"}">${sm}</div>`;
+    if(o){
+      h+=`<div class="item-detail">`;
+      if(i.ds&&i.ds!==i.sm)h+=`<div class="item-desc">${i.ds}</div>`;
+      h+=`<div class="item-actions">`;
+      if(i.tm)h+=`<span class="item-time">🕐 ${i.tm}</span>`;
+      if(p)h+=`<a class="pdf-btn" href="${p}" target="_self" onclick="event.stopPropagation()">📄 Open PDF</a>`;
+      h+=`</div></div>`;
+    }
+    h+=`</div>`;
+  });
+
+  if(!F.length)h+=`<div class="empty"><div class="empty-emoji">🔍</div><div class="empty-text">No disclosures found</div></div>`;
+  h+=`</div>`;
+  el.innerHTML=h;
+}
+
+function tabs() {
+  const c=gc();
+  const t=[{l:"Dividends",k:"Dividends",e:"💰"},{l:"Rights",k:"Rights Issue",e:"📈"},{l:"Dealings",k:"Dealings",e:"🔄"}];
+  let h=`<div class="navbar"><div class="navbar-inner">`;
+  t.forEach(f=>{
+    const on=sel===f.k;
+    h+=`<button class="tab${on?" on":""}" onclick="sel=sel==='${f.k}'?'ALL':'${f.k}';go()">
+      <div class="tab-icon">${f.e}</div>
+      <div class="tab-num">${c[f.k]||0}</div>
+      <div class="tab-label">${f.l}</div>
+    </button>`;
+  });
+  h+=`</div></div>`;
+  document.getElementById("nav").innerHTML=h;
+}
+
+fetchData();
+setInterval(fetchData,300000);
+</script>
+</body>
+</html>
