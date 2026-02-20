@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CSE Tracker">
+<meta name="theme-color" content="#0a0e17">
+<title>CSE Disclosure Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  min-height:100vh; background:linear-gradient(180deg,#0a0e17,#111827 50%,#0a0e17);
+  color:#e2e8f0; font-family:'DM Sans','Segoe UI',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.mono { font-family:'JetBrains Mono',monospace; }
+
+/* Header */
+.header {
+  background:linear-gradient(135deg,#0f172a,#1e293b);
+  border-bottom:1px solid rgba(59,130,246,.2);
+  padding:16px 20px; position:sticky; top:0; z-index:50;
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+}
+.header-row { display:flex; align-items:center; justify-content:space-between; }
+.logo {
+  font-size:20px; font-weight:700; letter-spacing:-.5px;
+  background:linear-gradient(135deg,#60a5fa,#a78bfa);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.sub { font-size:11px; color:#64748b; margin-top:2px; }
+.btn-refresh {
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  border:none; border-radius:12px; padding:10px 16px;
+  color:#fff; font-size:13px; font-weight:600; cursor:pointer;
+}
+.btn-refresh:disabled { opacity:.5; }
+.btn-refresh:active { transform:scale(.95); }
+
+/* Search */
+.search-wrap { margin-top:12px; position:relative; }
+.search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:16px; opacity:.4; }
+.search {
+  width:100%; background:#0f172a; border:1px solid #1e293b;
+  border-radius:12px; padding:12px 16px 12px 40px;
+  color:#e2e8f0; font-size:14px; outline:none; font-family:'DM Sans';
+}
+.search:focus { border-color:#3b82f6; }
+.search::placeholder { color:#475569; }
+
+/* Filter toggle */
+.filter-toggle {
+  margin-top:10px; background:none; border:1px solid #1e293b;
+  border-radius:8px; padding:6px 12px; color:#94a3b8;
+  font-size:12px; cursor:pointer; font-family:'DM Sans';
+}
+.filter-toggle:active { background:#1e293b; }
+
+/* Category chips */
+.cats { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+.chip {
+  border-radius:20px; padding:5px 10px; font-size:11px; cursor:pointer;
+  white-space:nowrap; font-family:'DM Sans'; border:1px solid #1e293b;
+  background:#0f172a; color:#94a3b8; transition:all .2s;
+}
+.chip.active { color:#fff; font-weight:600; }
+
+/* Cards */
+.cards { padding:8px 12px 120px; }
+.card {
+  background:#111827; border:1px solid #1e293b;
+  border-radius:16px; padding:14px 16px; margin-bottom:8px;
+  cursor:pointer; transition:all .2s; animation:fadeIn .3s ease both;
+}
+.card.expanded { background:linear-gradient(135deg,#1e293b,#0f172a); }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+.card-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.badge {
+  padding:3px 8px; border-radius:6px; font-size:10px; font-weight:600;
+  letter-spacing:.3px; white-space:nowrap;
+}
+.card-date { font-size:11px; color:#64748b; }
+.card-company { font-size:15px; font-weight:600; color:#f1f5f9; margin-bottom:6px; line-height:1.3; }
+.card-summary { font-size:13px; color:#94a3b8; line-height:1.5; overflow:hidden; transition:max-height .3s; }
+.card-summary.clamped { max-height:40px; }
+.card-detail { margin-top:12px; padding-top:12px; border-top:1px solid #1e293b; }
+.card-desc { font-size:12px; color:#64748b; margin-bottom:8px; }
+.card-meta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.card-time { font-size:11px; color:#64748b; }
+.btn-pdf {
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#fff; padding:6px 14px; border-radius:8px;
+  font-size:12px; font-weight:600; text-decoration:none;
+  display:inline-flex; align-items:center; gap:4px;
+}
+.btn-pdf:active { transform:scale(.95); }
+
+/* Empty state */
+.empty { text-align:center; padding:40px; color:#475569; }
+.empty-icon { font-size:40px; margin-bottom:12px; }
+
+/* Error */
+.error {
+  margin:16px; padding:16px; background:#7f1d1d; border-radius:12px;
+  border:1px solid #991b1b; font-size:13px;
+}
+.error-hint { margin-top:8px; font-size:11px; color:#fca5a5; }
+
+/* Loading */
+.loading { text-align:center; padding:60px 20px; color:#64748b; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.spinner { font-size:32px; margin-bottom:12px; display:inline-block; animation:spin 1s linear infinite; }
+
+/* Result count */
+.count { padding:12px 20px 4px; font-size:12px; color:#64748b; }
+
+/* Bottom bar */
+.bottom-bar {
+  position:fixed; bottom:0; left:0; right:0;
+  background:linear-gradient(180deg,transparent,#0a0e17 30%);
+  padding:20px 16px 16px;
+}
+.bottom-inner {
+  display:flex; justify-content:space-around;
+  background:#111827; border-radius:16px;
+  border:1px solid #1e293b; padding:10px;
+}
+.bottom-btn {
+  background:transparent; border:none; border-radius:12px;
+  padding:8px 12px; color:#64748b; font-size:11px; cursor:pointer;
+  text-align:center; font-family:'DM Sans'; font-weight:600; transition:all .2s;
+}
+.bottom-btn.active { color:var(--cat-color); background:var(--cat-bg); }
+.bottom-emoji { font-size:18px; }
+.bottom-label { font-size:9px; opacity:.7; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFnm5weSmdc4AkDCmN7HL1M5DGymv5N1MiJfSG3BFneRi-Cqj3dmfYWZINQGQjJ3ONFaBpCDk1NyEn/pub?output=csv";
+
+const CAT_CONFIG = {
+  "CASH DIVIDEND":{emoji:"💰",color:"#10b981",bg:"#064e3b"},
+  "CORPORATE DISCLOSURE":{emoji:"📋",color:"#3b82f6",bg:"#1e3a5f"},
+  "DEALINGS BY DIRECTORS":{emoji:"🔄",color:"#f59e0b",bg:"#78350f"},
+  "APPOINTMENT OF DIRECTORS":{emoji:"👤",color:"#8b5cf6",bg:"#4c1d95"},
+  "RESIGNATION OF DIRECTORS":{emoji:"🚪",color:"#ef4444",bg:"#7f1d1d"},
+  "RESIGNATION OF CHAIRPERSON":{emoji:"🚪",color:"#ef4444",bg:"#7f1d1d"},
+  "RETIREMENT OF THE CHAIRPERSON":{emoji:"🚪",color:"#ef4444",bg:"#7f1d1d"},
+  "APPOINTMENT OF CHAIRPERSON":{emoji:"👤",color:"#8b5cf6",bg:"#4c1d95"},
+  "ERRATA TO THE FINANCIAL STATEMENT":{emoji:"📝",color:"#ec4899",bg:"#831843"},
+  "DEBENTURE ISSUE":{emoji:"📊",color:"#06b6d4",bg:"#164e63"},
+  "RIGHTS ISSUE":{emoji:"📈",color:"#84cc16",bg:"#365314"},
+  "RIGHTS ISSUE (DATES)":{emoji:"📈",color:"#84cc16",bg:"#365314"},
+  "TRADING HALTED":{emoji:"⛔",color:"#ef4444",bg:"#7f1d1d"},
+  "TRADING HALT LIFTED":{emoji:"✅",color:"#10b981",bg:"#064e3b"},
+  "EXTRAORDINARY GENERAL MEETING":{emoji:"🏛️",color:"#a78bfa",bg:"#4c1d95"},
+  "WATCH LIST - TRANSFERRED IN":{emoji:"⚠️",color:"#f97316",bg:"#7c2d12"},
+  "CIRCULAR TO SHAREHOLDERS":{emoji:"📨",color:"#06b6d4",bg:"#164e63"},
+  "CLARIFICATION TO A NEWSPAPER ARTICLE":{emoji:"📰",color:"#f59e0b",bg:"#78350f"},
+  "RATING REVIEW":{emoji:"⭐",color:"#eab308",bg:"#713f12"},
+};
+const getCfg = cat => CAT_CONFIG[cat] || {emoji:"📄",color:"#94a3b8",bg:"#334155"};
+
+function parseCSV(text) {
+  const lines = []; let row = []; let cell = ""; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') { if (inQ && text[i+1] === '"') { cell += '"'; i++; } else inQ = !inQ; }
+    else if (c === ',' && !inQ) { row.push(cell); cell = ""; }
+    else if ((c === '\n' || c === '\r') && !inQ) {
+      if (cell || row.length) { row.push(cell); lines.push(row); row = []; cell = ""; }
+      if (c === '\r' && text[i+1] === '\n') i++;
+    } else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); lines.push(row); }
+  return lines;
+}
+
+function extractPdf(link) {
+  if (!link) return null;
+  const m = link.match(/HYPERLINK\("([^"]+)"/);
+  if (m) return m[1];
+  if (link.startsWith("http")) return link;
+  return null;
+}
+
+// ── State ──
+let data = [], filtered = [], search = "", selectedCat = "ALL", expanded = null;
+let loading = true, error = null, lastUpdate = null, showFilters = false;
+
+async function fetchData() {
+  try {
+    loading = true; error = null; render();
+    const resp = await fetch(CSV_URL);
+    if (!resp.ok) throw new Error("Sheet not published");
+    const text = await resp.text();
+    const lines = parseCSV(text);
+    if (lines.length < 2) throw new Error("No data");
+    data = lines.slice(1).filter(r => r[2]).map((r, i) => ({
+      id: i, date: r[0]||"", time: r[1]||"", company: r[2]||"",
+      subject: r[3]||"", description: r[4]||"", summary: r[5]||"",
+      pdfLink: r[6]||"", pdfCount: r[7]||"0",
+    }));
+    lastUpdate = new Date(); error = null;
+  } catch(e) { error = e.message; }
+  finally { loading = false; applyFilter(); }
+}
+
+function applyFilter() {
+  filtered = data.filter(item => {
+    if (selectedCat !== "ALL" && item.subject !== selectedCat) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return item.company.toLowerCase().includes(q) ||
+             item.summary.toLowerCase().includes(q) ||
+             item.description.toLowerCase().includes(q);
+    }
+    return true;
+  });
+  render();
+}
+
+function getCatCounts() {
+  const c = {};
+  data.forEach(d => { c[d.subject] = (c[d.subject]||0) + 1; });
+  return c;
+}
+
+function getCategories() {
+  return ["ALL", ...new Set(data.map(d => d.subject).filter(Boolean))].sort((a,b) => {
+    if (a === "ALL") return -1; if (b === "ALL") return 1; return a.localeCompare(b);
+  });
+}
+
+// ── Render ──
+function render() {
+  const app = document.getElementById("app");
+  const counts = getCatCounts();
+  const cats = getCategories();
+  const shortCat = s => s.length > 25 ? s.slice(0,22)+"..." : s;
+
+  let html = `
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <div class="logo">CSE Tracker</div>
+        <div class="sub mono">${data.length} disclosures${lastUpdate ? " · " + lastUpdate.toLocaleTimeString() : ""}</div>
+      </div>
+      <button class="btn-refresh" onclick="fetchData()" ${loading?"disabled":""}>${loading?"⟳":"Refresh"}</button>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search" type="text" placeholder="Search company or keyword..." value="${search}" oninput="search=this.value;applyFilter()">
+    </div>
+    <button class="filter-toggle" onclick="showFilters=!showFilters;render()">
+      ${showFilters ? "▲ Hide filters" : "▼ Filter by category (" + (selectedCat==="ALL"?"all":selectedCat.toLowerCase()) + ")"}
+    </button>`;
+
+  if (showFilters) {
+    html += `<div class="cats">`;
+    cats.forEach(cat => {
+      const cfg = getCfg(cat);
+      const active = selectedCat === cat;
+      const cnt = cat === "ALL" ? data.length : counts[cat]||0;
+      const label = cat === "ALL" ? `All (${cnt})` : `${cfg.emoji} ${cat.split(" ").slice(0,2).join(" ")} (${cnt})`;
+      html += `<button class="chip${active?" active":""}" style="${active ? `background:${cfg.bg};border-color:${cfg.color};color:#fff` : ""}" onclick="selectedCat='${cat}';showFilters=false;applyFilter()">${label}</button>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // Error
+  if (error) {
+    html += `<div class="error">⚠️ ${error}<div class="error-hint">Publish your Google Sheet: File → Share → Publish to web → CSV</div></div>`;
+  }
+
+  // Loading
+  if (loading && !data.length) {
+    html += `<div class="loading"><div class="spinner">⟳</div><br>Loading disclosures...</div>`;
+  }
+
+  // Count
+  if (!loading) {
+    let countText = `${filtered.length} ${filtered.length===1?"result":"results"}`;
+    if (search) countText += ` for "${search}"`;
+    if (selectedCat !== "ALL") countText += ` in ${selectedCat}`;
+    html += `<div class="count mono">${countText}</div>`;
+  }
+
+  // Cards
+  html += `<div class="cards">`;
+  filtered.forEach((item, idx) => {
+    const cfg = getCfg(item.subject);
+    const isExp = expanded === item.id;
+    const pdfUrl = extractPdf(item.pdfLink);
+    const delay = Math.min(idx * 0.03, 0.5);
+
+    html += `<div class="card${isExp?" expanded":""}" style="animation-delay:${delay}s;${isExp?`border-color:${cfg.color}40`:""}" onclick="expanded=${isExp?"null":item.id};render()">`;
+
+    // Top
+    html += `<div class="card-top">
+      <span class="badge mono" style="background:${cfg.bg};color:${cfg.color}">${cfg.emoji} ${shortCat(item.subject)}</span>
+      <span class="card-date mono">${item.date}</span>
+    </div>`;
+
+    // Company
+    html += `<div class="card-company">${item.company}</div>`;
+
+    // Summary
+    const summaryText = item.summary || item.description || "—";
+    html += `<div class="card-summary${isExp?"":" clamped"}">${summaryText}</div>`;
+
+    // Expanded
+    if (isExp) {
+      html += `<div class="card-detail">`;
+      if (item.description && item.description !== item.summary) {
+        html += `<div class="card-desc">${item.description}</div>`;
+      }
+      html += `<div class="card-meta">`;
+      if (item.time) html += `<span class="card-time mono">🕐 ${item.time}</span>`;
+      if (pdfUrl) html += `<a class="btn-pdf" href="${pdfUrl}" target="_self" onclick="event.stopPropagation()">📄 Open Full PDF</a>`;
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+  });
+
+  if (!loading && filtered.length === 0) {
+    html += `<div class="empty"><div class="empty-icon">🔍</div>No disclosures found</div>`;
+  }
+  html += `</div>`;
+
+  // Bottom bar
+  if (data.length > 0) {
+    const quickFilters = [
+      {label:"Dividends",key:"CASH DIVIDEND",emoji:"💰"},
+      {label:"Directors",key:"DEALINGS BY DIRECTORS",emoji:"🔄"},
+      {label:"Corporate",key:"CORPORATE DISCLOSURE",emoji:"📋"},
+    ];
+    html += `<div class="bottom-bar"><div class="bottom-inner">`;
+    quickFilters.forEach(f => {
+      const cfg = getCfg(f.key);
+      const active = selectedCat === f.key;
+      html += `<button class="bottom-btn${active?" active":""}" style="--cat-color:${cfg.color};--cat-bg:${cfg.bg}" onclick="selectedCat=selectedCat==='${f.key}'?'ALL':'${f.key}';applyFilter()">
+        <div class="bottom-emoji">${f.emoji}</div>
+        <div>${counts[f.key]||0}</div>
+        <div class="bottom-label">${f.label}</div>
+      </button>`;
+    });
+    html += `</div></div>`;
+  }
+
+  app.innerHTML = html;
+}
+
+// Boot
+fetchData();
+setInterval(fetchData, 300000); // refresh every 5min
+</script>
+</body>
+</html>
