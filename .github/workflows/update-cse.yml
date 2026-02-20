@@ -1,0 +1,33 @@
+name: CSE Tracker Auto-Update
+
+on:
+  schedule:
+    # Runs every hour during CSE trading hours (Mon-Fri, 4:30 AM - 1:00 PM UTC = 10:00 AM - 6:30 PM SL time)
+    - cron: '0 4-13 * * 1-5'
+    # Also run once at 14:00 UTC (7:30 PM SL) to catch after-hours announcements
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch: # Allow manual trigger from GitHub
+
+jobs:
+  update-sheet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install gspread google-auth google-api-python-client PyPDF2 requests
+
+      - name: Run CSE Tracker
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python cse_tracker_headless.py
