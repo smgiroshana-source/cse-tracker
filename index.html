@@ -217,6 +217,7 @@ const G = {
   "Dividends":     { e:"💰", m:s=>s.includes("CASH DIVIDEND") },
   "Dealings":      { e:"🔄", m:s=>s.includes("DEALINGS BY DIRECTORS") },
   "Rights Issue":  { e:"📈", m:s=>s.includes("RIGHTS ISSUE") },
+  "Splits":        { e:"✂️", m:s=>s.includes("SPLIT") || s.includes("SUB DIVISION") },
   "Restructuring": { e:"👥", m:s=>["APPOINTMENT","RESIGNATION","RETIREMENT","REMOVAL","DEATH"].some(k=>s.includes(k)) },
   "Other":         { e:"📋", m:s=>true },
 };
@@ -238,6 +239,8 @@ const B = {
   "CIRCULAR":["var(--sky)","var(--sky-bg)"],
   "CLARIFICATION":["var(--amber)","var(--amber-bg)"],
   "ERRATA":["var(--rose)","var(--rose-bg)"],
+  "SPLIT":["var(--violet)","var(--violet-bg)"],
+  "SUB DIVISION":["var(--violet)","var(--violet-bg)"],
 };
 function badge(s) { for(const[k,v]of Object.entries(B)){if(s.includes(k))return v} return ["var(--text-3)","var(--bg)"] }
 
@@ -283,7 +286,7 @@ function gc(){const c={};D.forEach(d=>{c[d.g]=(c[d.g]||0)+1});return c}
 function chips() {
   const c=gc();
   document.getElementById("chips").innerHTML=
-    ["ALL","Dividends","Dealings","Rights Issue","Restructuring","Other"].map(g=>{
+    ["ALL","Dividends","Dealings","Rights Issue","Splits","Restructuring","Other"].map(g=>{
       const on=sel===g; const n=g==="ALL"?D.length:c[g]||0;
       const e=G[g]?G[g].e+" ":"";
       return `<div class="chip${on?" on":""}" onclick="sel='${g}';go()">${g==="ALL"?"All":e+g}<span class="chip-count">${n}</span></div>`;
@@ -325,7 +328,7 @@ function draw() {
 
 function tabs() {
   const c=gc();
-  const t=[{l:"Dividends",k:"Dividends",e:"💰"},{l:"Rights",k:"Rights Issue",e:"📈"},{l:"Dealings",k:"Dealings",e:"🔄"}];
+  const t=[{l:"Dividends",k:"Dividends",e:"💰"},{l:"Rights",k:"Rights Issue",e:"📈"},{l:"Dealings",k:"Dealings",e:"🔄"},{l:"Splits",k:"Splits",e:"✂️"}];
   let h=`<div class="navbar"><div class="navbar-inner">`;
   t.forEach(f=>{
     const on=sel===f.k;
