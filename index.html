@@ -114,12 +114,6 @@ body {
   animation:glow 2s ease infinite alternate;
 }
 @keyframes glow { from{box-shadow:0 0 4px rgba(16,185,129,.3)} to{box-shadow:0 0 12px rgba(16,185,129,.5)} }
-.mark-btn {
-  display:inline-block; margin:6px 18px 0; padding:8px 16px; border-radius:10px;
-  background:var(--surface); border:1.5px solid var(--border); color:var(--text-2);
-  font-size:13px; font-weight:600; cursor:pointer; font-family:'Plus Jakarta Sans';
-}
-.mark-btn:active { transform:scale(.96); }
 
 .item-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
 .tag {
@@ -267,18 +261,21 @@ function csv(t) {
 function pdf(l) { if(!l)return null; const m=l.match(/HYPERLINK\("([^"]+)"/); if(m)return m[1]; if(l.startsWith("http"))return l; return null }
 
 let D=[],F=[],q="",sel="ALL",exp=null,ld=true,err=null,upd=null;
-let seenKeys=new Set(), newKeys=new Set();
+let seenKeys={}, newKeys=new Set(), firstEver=false;
 
-// Load previously seen items from this device
-try { const s=localStorage.getItem("cse_seen"); if(s) seenKeys=new Set(JSON.parse(s)); } catch(e){}
+// Load seen history: {key: timestamp}
+try { const s=localStorage.getItem("cse_seen2"); if(s) seenKeys=JSON.parse(s); else firstEver=true; } catch(e){ firstEver=true; }
 
 function itemKey(i) { return `${i.dt}|${i.tm}|${i.co}`; }
 
-function markAllRead() {
-  D.forEach(i=>seenKeys.add(itemKey(i)));
-  newKeys.clear();
-  try { localStorage.setItem("cse_seen",JSON.stringify([...seenKeys])); } catch(e){}
-  go();
+function parseDate(d) {
+  // "20 FEB 2026" or "20 Feb 2026"
+  try { return new Date(d); } catch(e){ return null; }
+}
+
+function isOlderThan(days, dateStr) {
+  const d=parseDate(dateStr); if(!d||isNaN(d)) return false;
+  return (Date.now()-d.getTime()) > days*86400000;
 }
 document.getElementById("search-box").addEventListener("input",function(){q=this.value;go()});
 
@@ -296,13 +293,30 @@ async function fetchData() {
     upd=new Date(); err=null;
     // Detect new items
     newKeys.clear();
-    D.forEach(i=>{
-      const k=itemKey(i);
-      if(!seenKeys.has(k)) newKeys.add(k);
-    });
-    // Save all current items as seen for next time
-    D.forEach(i=>seenKeys.add(itemKey(i)));
-    try { localStorage.setItem("cse_seen",JSON.stringify([...seenKeys])); } catch(e){}
+    const now=Date.now();
+    if(firstEver){
+      // First time on this device: save everything as seen, no NEW badges
+      D.forEach(i=>{ seenKeys[itemKey(i)]=now; });
+      firstEver=false;
+    } else {
+      D.forEach(i=>{
+        const k=itemKey(i);
+        if(!seenKeys[k] && !isOlderThan(3,i.dt)){
+          // New item, less than 5 days old
+          newKeys.add(k);
+          seenKeys[k]=now; // mark seen with timestamp
+        }
+      });
+    }
+    // Auto-expire: remove items seen more than 1 day ago from "new"
+    for(const k of newKeys){
+      if(seenKeys[k] && (now-seenKeys[k])>86400000) newKeys.delete(k);
+    }
+    // Clean old entries (>30 days) to prevent localStorage bloat
+    for(const k in seenKeys){
+      if((now-seenKeys[k])>30*86400000) delete seenKeys[k];
+    }
+    try { localStorage.setItem("cse_seen2",JSON.stringify(seenKeys)); } catch(e){}
   } catch(e){err=e.message}
   finally{ld=false; go(); btn.classList.remove("spinning")}
 }
@@ -315,10 +329,8 @@ function go() {
   });
   chips(); draw(); tabs();
   const s=document.getElementById("sub");
-  if(D.length){
-    const nc=newKeys.size;
-    s.innerHTML=`${D.length} disclosures · updated ${upd?upd.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):""}${nc?` · <b style="color:#10b981">${nc} new</b>`:""}`;
-  }}
+  if(D.length) s.textContent=`${D.length} disclosures · updated ${upd?upd.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):""}`;
+}
 
 function gc(){const c={};D.forEach(d=>{c[d.g]=(c[d.g]||0)+1});return c}
 
@@ -337,10 +349,7 @@ function draw() {
   if(err){el.innerHTML=`<div class="err">⚠️ ${err}<small>Publish sheet: File → Share → Publish to web → CSV</small></div>`;return}
   if(ld&&!D.length){el.innerHTML=`<div class="load"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><div class="load-text">Loading disclosures...</div></div>`;return}
 
-  const newCount = F.filter(i=>newKeys.has(itemKey(i))).length;
-  let h=`<div class="count">${F.length} result${F.length!==1?"s":""}${q?' · "'+q+'"':""}${sel!=="ALL"?" · "+sel:""}${newCount?` · <b style="color:#10b981">${newCount} new</b>`:""}</div>`;
-  if(newCount) h+=`<button class="mark-btn" onclick="markAllRead()">✓ Mark all as read</button>`;
-  h+=`<div class="feed">`;
+  let h=`<div class="count">${F.length} result${F.length!==1?"s":""}${q?' · "'+q+'"':""}${sel!=="ALL"?" · "+sel:""}</div><div class="feed">`;
 
   F.forEach(i=>{
     const o=exp===i.id; const p=pdf(i.pl);
@@ -349,7 +358,7 @@ function draw() {
     const sj=i.sj.length>30?i.sj.slice(0,27)+"…":i.sj;
     const sm=i.sm||i.ds||"—";
 
-    h+=`<div class="item${o?" open":""}${isNew?" fresh":""}" onclick="exp=${o?"null":i.id};draw()">`;
+    h+=`<div class="item${o?" open":""}${isNew?" fresh":""}" onclick="newKeys.delete('${itemKey(i).replace(/'/g,"\\'")}');exp=${o?"null":i.id};draw()">`;
     h+=`<div class="item-head"><span class="tag" style="background:${bg};color:${bc}">${sj}</span><span class="item-date">${i.dt}${isNew?'<span class="new-badge">NEW</span>':''}</span></div>`;
     h+=`<div class="item-company">${i.co}</div>`;
     h+=`<div class="item-summary${o?"":" clamp"}">${sm}</div>`;
