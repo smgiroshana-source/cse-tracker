@@ -28,8 +28,8 @@ except ImportError:
 
 SERVICE_ACCOUNT_JSON = os.environ.get("SERVICE_ACCOUNT_JSON", "service_account.json")
 SPREADSHEET_NAME = os.environ.get("SPREADSHEET_NAME", "CSE Disclosures Tracker")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyB7tgMltxeeV-p4jmhn8s-tMWmCgF_tXJM")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 MAX_DISCLOSURES = 100
 SUMMARY_DELAY = 6
 CSE_API = "https://www.cse.lk/api/"
