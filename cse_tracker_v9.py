@@ -28,8 +28,8 @@ except ImportError:
 
 SERVICE_ACCOUNT_JSON = os.environ.get("SERVICE_ACCOUNT_JSON", "service_account.json")
 SPREADSHEET_NAME = os.environ.get("SPREADSHEET_NAME", "CSE Disclosures Tracker")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyB7tgMltxeeV-p4jmhn8s-tMWmCgF_tXJM")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
 MAX_DISCLOSURES = 100
 SUMMARY_DELAY = 6
 CSE_API = "https://www.cse.lk/api/"
@@ -49,6 +49,14 @@ def build_structured_summary(ann_data):
     elif dtype == "RightsIssue": return _build_rights(base, company)
     elif dtype == "ExtraOrdinaryGeneralMeetingInitial": return _build_egm(base, company)
     elif dtype in ("AgmInitial",): return _build_agm(base, company)
+    # Generic fallback: try description/remarks from API data
+    desc = base.get("description","") or ""
+    remarks = base.get("remarks","") or ""
+    text = (desc + " " + remarks).strip()
+    if text and len(text) > 20:
+        text = re.sub(r'\s+',' ',text).strip()
+        if len(text) > 500: text = text[:497] + "..."
+        return f"{company}: {text}"
     return None
 
 def _build_dividend(b, co):
@@ -307,6 +315,14 @@ def process_one_item(gm, item, existing_keys, log=print):
         if pt:
             summary=ai_summarize(pt,co,cat,log=log)
             if summary: log(f"    ✓ AI summary")
+    if not summary and detail and not pdfs:
+        # No PDF — try AI on description/remarks text
+        base=detail.get("reqBaseAnnouncement",{})
+        desc_text=(base.get("description","") or "") + " " + (base.get("remarks","") or "")
+        desc_text=desc_text.strip()
+        if desc_text and len(desc_text)>30:
+            summary=ai_summarize(desc_text,co,cat,log=log)
+            if summary: log(f"    ✓ AI summary (from description)")
     if not summary: summary=f"{co} — {cat}."; log(f"    ⚠ Fallback")
     # Write
     w=0
@@ -348,6 +364,19 @@ def fix_old_summaries(gm, items, log=print, running_check=None):
                 pt=download_pdf_text(url.replace(CSE_CDN,"").replace("https://cdn.cse.lk/",""),log=log)
                 if pt: s=ai_summarize(pt,co,subj,log=log)
                 if s: log(f"    ✓ AI")
+        if not s and not pl:
+            # No PDF — try AI on description from API
+            for it in items:
+                if it.get("company","").strip()==co.strip() and it.get("announcementCategory","").strip()==subj.strip():
+                    d=get_detail(it.get("announcementId"))
+                    if d:
+                        base=d.get("reqBaseAnnouncement",{})
+                        desc_text=(base.get("description","") or "") + " " + (base.get("remarks","") or "")
+                        desc_text=desc_text.strip()
+                        if desc_text and len(desc_text)>30:
+                            s=ai_summarize(desc_text,co,subj,log=log)
+                            if s: log(f"    ✓ AI (from description)")
+                    break
         if s:
             try: gm.worksheet.update_cell(rn,6,s)
             except Exception as e: log(f"    ✗ {e}")
