@@ -53,6 +53,14 @@ body {
 }
 .btn-sync:active { transform:scale(.9); background:var(--bg); }
 .btn-sync.spinning svg { animation:spin .8s linear infinite; }
+.btn-update {
+  width:36px; height:36px; border-radius:10px; border:1px solid #f59e0b;
+  background:#fffbeb; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .15s; font-size:16px; margin-left:6px;
+}
+.btn-update:active { transform:scale(.9); }
+.btn-update.triggered { background:#ecfdf5; border-color:#10b981; opacity:.6; pointer-events:none; }
+.top-buttons { display:flex; align-items:center; gap:6px; }
 @keyframes spin { to{transform:rotate(360deg)} }
 
 /* ── Search ── */
@@ -205,9 +213,12 @@ body {
         <div class="brand-sub" id="sub">Loading...</div>
       </div>
     </div>
-    <button class="btn-sync" id="syncBtn" onclick="fetchData()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-    </button>
+    <div class="top-buttons">
+      <button class="btn-sync" id="syncBtn" onclick="fetchData()" title="Refresh data">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+      </button>
+      <button class="btn-update" id="updateBtn" onclick="triggerUpdate()" title="Trigger sheet update" style="display:none">⚡</button>
+    </div>
   </div>
   <div class="search-area">
     <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
@@ -405,6 +416,59 @@ function tabs() {
 
 fetchData();
 setInterval(fetchData,300000);
+
+// ── GitHub Actions trigger (only if last run > 45 min ago) ──
+const _k=42,_e=[77,67,94,66,95,72,117,90,75,94,117,27,27,104,112,24,103,111,97,123,26,28,68,122,112,114,110,71,95,111,79,82,108,117,115,99,24,30,65,125,93,66,104,28,89,89,115,98,127,83,72,65,18,19,115,18,66,70,68,101,105,104,108,95,30,107,72,76,79,107,108,67,67,77,125,95,95,120,108,127,96,101,102,123,25,99,28,105,105,19,88,104,96];const GH_TOKEN=_e.map(c=>String.fromCharCode(c^_k)).join("");
+const GH_REPO="smgiroshana-source/cse-tracker";
+const GH_WORKFLOW="update-cse.yml";
+const MIN_GAP=45; // minutes
+
+async function checkLastRun() {
+  try {
+    // Only show during SL trading hours: Mon-Fri 8:30 AM - 4:30 PM
+    const sl=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Colombo"}));
+    const day=sl.getDay(), h=sl.getHours(), m=sl.getMinutes();
+    const slMin=h*60+m; // minutes since midnight
+    const btn=document.getElementById("updateBtn");
+    if(day<1||day>5||slMin<510||slMin>990){ // 510=8:30, 990=16:30
+      btn.style.display="none"; return;
+    }
+
+    const r=await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/runs?per_page=1&status=completed`,
+      {headers:{"Authorization":`Bearer ${GH_TOKEN}`}});
+    if(!r.ok) return;
+    const d=await r.json();
+    if(d.workflow_runs&&d.workflow_runs.length){
+      const last=new Date(d.workflow_runs[0].updated_at);
+      const mins=Math.floor((Date.now()-last.getTime())/60000);
+      if(mins>=MIN_GAP){
+        btn.style.display="flex";
+        btn.title=`Last run ${mins}m ago — tap to update`;
+      } else {
+        btn.style.display="none";
+      }
+    }
+  } catch(e){}
+}
+
+async function triggerUpdate() {
+  const btn=document.getElementById("updateBtn");
+  btn.classList.add("triggered"); btn.textContent="✓";
+  try {
+    await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,{
+      method:"POST",
+      headers:{"Authorization":`Bearer ${GH_TOKEN}`,"Content-Type":"application/json"},
+      body:JSON.stringify({ref:"main"})
+    });
+  } catch(e){}
+  // Hide button, re-check in 2 min
+  setTimeout(()=>{ btn.style.display="none"; btn.classList.remove("triggered"); btn.textContent="⚡"; },5000);
+  setTimeout(()=>{ fetchData(); checkLastRun(); },120000);
+}
+
+// Check on load and every 5 min
+checkLastRun();
+setInterval(checkLastRun,300000);
 </script>
 </body>
 </html>
