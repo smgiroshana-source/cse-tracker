@@ -290,6 +290,15 @@ async function fetchData() {
       sj:r[3]||"",ds:r[4]||"",sm:r[5]||"",
       pl:r[6]||"",pc:r[7]||"0",g:grp(r[3]||""),
     }));
+    // Sort newest first
+    D.sort((a,b)=>{
+      const da=new Date(a.dt), db=new Date(b.dt);
+      if(isNaN(da)&&isNaN(db)) return 0;
+      if(isNaN(da)) return 1; if(isNaN(db)) return -1;
+      if(db-da!==0) return db-da;
+      return (b.tm||"").localeCompare(a.tm||"");
+    });
+    D.forEach((d,i)=>d.id=i);
     upd=new Date(); err=null;
     // Detect new items
     newKeys.clear();
