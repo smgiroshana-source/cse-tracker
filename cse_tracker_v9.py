@@ -249,16 +249,42 @@ class GoogleManager:
 
 # ─── CSE API ──────────────────────────────────────────────────────────
 def fetch_announcements(log=print):
-    today=datetime.now().strftime("%Y-%m-%d")
-    start=(datetime.now()-timedelta(days=14)).strftime("%Y-%m-%d")
+    # Method 1: Scrape rendered CSE website with Playwright (real-time data)
+    try:
+        from playwright.sync_api import sync_playwright
+        log("  Trying Playwright scrape...")
+        with sync_playwright() as p:
+            browser=p.chromium.launch(headless=True)
+            page=browser.new_page()
+            # Intercept API response
+            api_items=[]
+            def handle_response(response):
+                nonlocal api_items
+                if "approvedAnnouncement" in response.url:
+                    try:
+                        data=response.json()
+                        api_items=data.get("approvedAnnouncements",[])
+                    except: pass
+            page.on("response",handle_response)
+            page.goto("https://www.cse.lk/pages/corporate-disclosures/corporate-disclosures.component.html",wait_until="networkidle",timeout=30000)
+            page.wait_for_timeout(5000)
+            browser.close()
+            if api_items:
+                dates=sorted(set(it.get("dateOfAnnouncement","") for it in api_items))
+                log(f"✓ {len(api_items)} announcements via Playwright ({dates[0]} → {dates[-1]})")
+                return api_items[:MAX_DISCLOSURES]
+            else: log("  Playwright: no data intercepted")
+    except ImportError: log("  Playwright not installed, using API fallback")
+    except Exception as e: log(f"  Playwright error: {e}, using API fallback")
     
-    # Correct params: fromDate, toDate (found from CSE website network tab)
-    r=requests.post(CSE_API+"approvedAnnouncement",
-        data={"fromDate":start,"toDate":today},
-        headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
+    # Method 2: Direct API (may have delay)
+    r=requests.post(CSE_API+"approvedAnnouncement",headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
     if r.status_code!=200: log(f"✗ API {r.status_code}"); return []
     items=r.json().get("approvedAnnouncements",[])
-    log(f"✓ {len(items)} announcements ({start} → {today})")
+    if items:
+        dates=sorted(set(it.get("dateOfAnnouncement","") for it in items))
+        log(f"✓ {len(items)} announcements via API ({dates[0]} → {dates[-1]})")
+    else: log("✓ 0 announcements")
     return items[:MAX_DISCLOSURES]
 
 def get_detail(ann_id):
@@ -402,12 +428,15 @@ def run_headless():
     items=fetch_announcements(log=hl)
     if not items: hl("No announcements"); return
     new=[]
+    skipped=0
     for it in items:
         co=it.get("company",""); ds=it.get("dateOfAnnouncement",""); cr=it.get("createdDate",0)
         try: dt=datetime.fromtimestamp(cr/1000); ts=dt.strftime("%I:%M:%S %p")
         except: ts=""
         uk=f"{ds}|{ts}|{co}"
         if uk not in ek and not any(k.startswith(uk) for k in ek): new.append(it)
+        else: skipped+=1
+    hl(f"  {len(new)} NEW, {skipped} skipped (already exist)")
     hl(f"  {len(new)} NEW")
     if new:
         hl("─"*40); hl("PROCESSING ROW BY ROW"); hl("─"*40)
@@ -514,5 +543,4 @@ if __name__=="__main__":
         except: headless=True
     if headless: run_headless()
     else: run_gui()
-
 
