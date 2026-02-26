@@ -251,31 +251,15 @@ class GoogleManager:
 def fetch_announcements(log=print):
     today=datetime.now().strftime("%Y-%m-%d")
     start=(datetime.now()-timedelta(days=14)).strftime("%Y-%m-%d")
-    # Try multiple payload formats to find one that returns today's data
-    attempts=[
-        ("form+dates", "form", {"startDate":start,"endDate":today,"company":"","category":""}),
-        ("form+alt", "form", {"startFrom":start,"startTo":today}),
-        ("json+dates", "json", {"startDate":start,"endDate":today,"company":"","category":""}),
-        ("json+alt", "json", {"startFrom":start,"startTo":today}),
-        ("json+body", "json", {"startDate":start,"endDate":today}),
-        ("no-params", "form", {}),
-    ]
-    best_items=[]
-    for name,mode,payload in attempts:
-        try:
-            if mode=="json":
-                r=requests.post(CSE_API+"approvedAnnouncement",json=payload,
-                    headers={**HTTP_HEADERS,'Content-Type':'application/json'},timeout=20)
-            else:
-                r=requests.post(CSE_API+"approvedAnnouncement",data=payload,
-                    headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
-            if r.status_code==200:
-                items=r.json().get("approvedAnnouncements",[])
-                log(f"  [{name}] → {len(items)} items")
-                if len(items)>len(best_items): best_items=items
-        except Exception as e: log(f"  [{name}] error: {e}")
-    log(f"✓ {len(best_items)} announcements (range: {start} → {today})")
-    return best_items[:MAX_DISCLOSURES]
+    
+    # Correct params: fromDate, toDate (found from CSE website network tab)
+    r=requests.post(CSE_API+"approvedAnnouncement",
+        data={"fromDate":start,"toDate":today},
+        headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
+    if r.status_code!=200: log(f"✗ API {r.status_code}"); return []
+    items=r.json().get("approvedAnnouncements",[])
+    log(f"✓ {len(items)} announcements ({start} → {today})")
+    return items[:MAX_DISCLOSURES]
 
 def get_detail(ann_id):
     try:
