@@ -2,12 +2,9 @@ name: CSE Tracker Auto-Update
 
 on:
   schedule:
-    # Runs every 1/2 hour during CSE trading hours (Mon-Fri, 4:30 AM - 1:00 PM UTC = 8:30 AM - 7:30 PM SL time)
-    - cron: '*/30 3-10 * * 1-5'
-    # Also run once at 14:00 UTC (7:30 PM SL) to catch after-hours announcements
-    - cron: '0 14 * * 1-5'
-  workflow_dispatch: # Allow manual trigger from GitHub
-
+    - cron: '*/15 3-10 * * 1-5'
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch:
 
 jobs:
   update-sheet:
@@ -24,7 +21,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install gspread google-auth google-api-python-client PyPDF2 requests
+        run: |
+          pip install gspread google-auth google-api-python-client PyPDF2 requests playwright
+          playwright install chromium --with-deps
 
       - name: Run CSE Tracker
         env:
