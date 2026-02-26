@@ -249,42 +249,83 @@ class GoogleManager:
 
 # ─── CSE API ──────────────────────────────────────────────────────────
 def fetch_announcements(log=print):
-    # Method 1: Scrape rendered CSE website with Playwright (real-time data)
+    items=[]
+    seen_ids=set()
+    
+    # Method 1: Scrape CSE website DOM (real-time data)
     try:
         from playwright.sync_api import sync_playwright
-        log("  Trying Playwright scrape...")
+        log("  Scraping CSE website...")
         with sync_playwright() as p:
             browser=p.chromium.launch(headless=True)
             page=browser.new_page()
-            # Intercept API response
-            api_items=[]
-            def handle_response(response):
-                nonlocal api_items
-                if "approvedAnnouncement" in response.url:
-                    try:
-                        data=response.json()
-                        api_items=data.get("approvedAnnouncements",[])
-                    except: pass
-            page.on("response",handle_response)
-            page.goto("https://www.cse.lk/pages/corporate-disclosures/corporate-disclosures.component.html",wait_until="networkidle",timeout=30000)
+            page.goto("https://www.cse.lk/pages/corporate-disclosures/corporate-disclosures.component.html",timeout=30000)
+            page.wait_for_load_state("networkidle")
             page.wait_for_timeout(5000)
+            # Extract announcement data from rendered page
+            scraped=page.evaluate("""() => {
+                const rows=document.querySelectorAll('.ann-row, .announcement-row, tr[class*=ann], .card, [class*=announce]');
+                const results=[];
+                rows.forEach(r=>{
+                    const text=r.innerText||'';
+                    if(text.length>10) results.push(text);
+                });
+                // Also try to grab from Angular component state
+                try {
+                    const el=document.querySelector('app-corporate-disclosures, [class*=corporate]');
+                    if(el && el.__ngContext__) {
+                        const ctx=el.__ngContext__;
+                        for(const item of ctx) {
+                            if(Array.isArray(item) && item.length>5 && item[0]?.announcementId) return item;
+                        }
+                    }
+                } catch(e){}
+                // Try getting data from page scripts
+                try {
+                    const scripts=document.querySelectorAll('script');
+                    for(const s of scripts) {
+                        if(s.textContent.includes('approvedAnnouncements')) {
+                            try { return JSON.parse(s.textContent).approvedAnnouncements; } catch(e){}
+                        }
+                    }
+                } catch(e){}
+                return results;
+            }""")
+            # Also intercept by making our own fetch from within the page context
+            page_api=page.evaluate("""async () => {
+                try {
+                    const r=await fetch('/api/approvedAnnouncement',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+                    const d=await r.json();
+                    return d.approvedAnnouncements||[];
+                } catch(e){ return []; }
+            }""")
             browser.close()
-            if api_items:
-                dates=sorted(set(it.get("dateOfAnnouncement","") for it in api_items))
-                log(f"✓ {len(api_items)} announcements via Playwright ({dates[0]} → {dates[-1]})")
-                return api_items[:MAX_DISCLOSURES]
-            else: log("  Playwright: no data intercepted")
-    except ImportError: log("  Playwright not installed, using API fallback")
-    except Exception as e: log(f"  Playwright error: {e}, using API fallback")
+            if page_api and isinstance(page_api,list) and len(page_api)>0 and isinstance(page_api[0],dict):
+                for it in page_api:
+                    aid=it.get("announcementId")
+                    if aid and aid not in seen_ids:
+                        items.append(it); seen_ids.add(aid)
+                log(f"  [Scrape] → {len(page_api)} items from page fetch")
+    except ImportError: log("  Playwright not installed")
+    except Exception as e: log(f"  Scrape error: {e}")
     
-    # Method 2: Direct API (may have delay)
-    r=requests.post(CSE_API+"approvedAnnouncement",headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
-    if r.status_code!=200: log(f"✗ API {r.status_code}"); return []
-    items=r.json().get("approvedAnnouncements",[])
+    # Method 2: Direct API (merge any new items)
+    try:
+        r=requests.post(CSE_API+"approvedAnnouncement",headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
+        if r.status_code==200:
+            api_items=r.json().get("approvedAnnouncements",[])
+            added=0
+            for it in api_items:
+                aid=it.get("announcementId")
+                if aid and aid not in seen_ids:
+                    items.append(it); seen_ids.add(aid); added+=1
+            log(f"  [API] → {len(api_items)} items ({added} new after merge)")
+    except Exception as e: log(f"  API error: {e}")
+    
     if items:
         dates=sorted(set(it.get("dateOfAnnouncement","") for it in items))
-        log(f"✓ {len(items)} announcements via API ({dates[0]} → {dates[-1]})")
-    else: log("✓ 0 announcements")
+        log(f"✓ Total: {len(items)} announcements ({dates[0]} → {dates[-1]})")
+    else: log("✗ No announcements")
     return items[:MAX_DISCLOSURES]
 
 def get_detail(ann_id):
@@ -543,4 +584,3 @@ if __name__=="__main__":
         except: headless=True
     if headless: run_headless()
     else: run_gui()
-
