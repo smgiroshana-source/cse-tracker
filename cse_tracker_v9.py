@@ -13,7 +13,7 @@ Usage:
 """
 
 import time, os, sys, threading, webbrowser, requests, io, re, json
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 import PyPDF2
 
@@ -249,9 +249,24 @@ class GoogleManager:
 
 # ─── CSE API ──────────────────────────────────────────────────────────
 def fetch_announcements(log=print):
-    r=requests.post(CSE_API+"approvedAnnouncement",headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
-    if r.status_code!=200: log(f"✗ API {r.status_code}"); return []
-    items=r.json().get("approvedAnnouncements",[]); log(f"✓ {len(items)} announcements"); return items[:MAX_DISCLOSURES]
+    today=datetime.now().strftime("%Y-%m-%d")
+    start=(datetime.now()-timedelta(days=14)).strftime("%Y-%m-%d")
+    # Try with date range first (gets today's announcements)
+    for payload in [
+        {"startDate":start,"endDate":today},
+        {"startDate":start,"endDate":today,"company":"","category":""},
+        {},  # fallback: no params
+    ]:
+        try:
+            r=requests.post(CSE_API+"approvedAnnouncement",data=payload,
+                headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
+            if r.status_code==200:
+                items=r.json().get("approvedAnnouncements",[])
+                if items:
+                    log(f"✓ {len(items)} announcements (range: {start} → {today})")
+                    return items[:MAX_DISCLOSURES]
+        except Exception as e: log(f"  API attempt error: {e}")
+    log("✗ No announcements from any method"); return []
 
 def get_detail(ann_id):
     try:
@@ -506,3 +521,4 @@ if __name__=="__main__":
         except: headless=True
     if headless: run_headless()
     else: run_gui()
+
