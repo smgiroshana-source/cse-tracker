@@ -328,6 +328,45 @@ def fetch_announcements(log=print):
     else: log("✗ No announcements")
     return items[:MAX_DISCLOSURES]
 
+# ─── FINANCIAL REPORTS ────────────────────────────────────────────────
+def fetch_financial_reports(log=print):
+    try:
+        r=requests.post(CSE_API+"getFinancialAnnouncement",
+            headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=20)
+        if r.status_code!=200:
+            log(f"  [Financials] HTTP {r.status_code}"); return []
+        data=r.json().get("reqFinancialAnnouncemnets",[])
+        log(f"  [Financials] → {len(data)} reports")
+        return data[:MAX_DISCLOSURES]
+    except Exception as e:
+        log(f"  [Financials] error: {e}"); return []
+
+def categorize_financial(file_text):
+    t=(file_text or "").upper()
+    if "ANNUAL REPORT" in t: return "ANNUAL REPORT"
+    if "INTERIM" in t: return "INTERIM FINANCIAL STATEMENT"
+    if "QUARTER" in t: return "QUARTERLY FINANCIAL STATEMENT"
+    if "AUDITED" in t: return "AUDITED FINANCIAL STATEMENT"
+    return "FINANCIAL STATEMENT"
+
+def process_financial_report(gm, item, existing_keys, log=print):
+    co=item.get("name",""); file_text=item.get("fileText","")
+    path=item.get("path",""); upload=item.get("uploadedDate","")
+    m=re.match(r'(\d{1,2}\s+\w+\s+\d{4})\s+(.+)',upload)
+    if m: ds=m.group(1).upper(); ts=m.group(2)
+    else: ds=upload.upper(); ts=""
+    cat=categorize_financial(file_text)
+    ukey=f"{ds}|{ts}|{co}"
+    if ukey in existing_keys or any(k.startswith(ukey) for k in existing_keys): return 0
+    log(f"  {co[:40]} — {cat}")
+    pdf_url=(CSE_CDN+path).replace(' ','%20') if path else ""
+    summary=f"{co}: {file_text}." if file_text else f"{co} — {cat}."
+    try:
+        gm.worksheet.append_row([ds,ts,co,cat,file_text[:200],summary,pdf_url,1 if pdf_url else 0,ukey],value_input_option='RAW')
+        existing_keys.add(ukey); log("    ✓ Written"); return 1
+    except Exception as e:
+        log(f"    ✗ Write error: {e}"); return 0
+
 def get_detail(ann_id):
     try:
         r=requests.post(CSE_API+"getAnnouncementById",data={"announcementId":ann_id},headers={**HTTP_HEADERS,'Content-Type':'application/x-www-form-urlencoded'},timeout=15)
@@ -489,6 +528,15 @@ def run_headless():
             if i<len(new)-1: time.sleep(SUMMARY_DELAY)
         hl(f"\n  Total: {tot} rows")
     else: hl("  Up to date!")
+    # Financial reports
+    hl("─"*40); hl("FINANCIAL REPORTS"); hl("─"*40)
+    fr_items=fetch_financial_reports(log=hl)
+    if fr_items:
+        fr_added=0
+        for it in fr_items:
+            try: fr_added+=process_financial_report(gm,it,ek,log=hl)
+            except Exception as e: hl(f"    ✗ {e}")
+        hl(f"  Financial reports: {fr_added} added")
     fix_old_summaries(gm,items,log=hl)
     hl("="*50); hl(f"✓ DONE in {time.time()-start:.0f}s"); hl("="*50)
 
@@ -562,6 +610,17 @@ def run_gui():
                         tot+=process_one_item(self.gm,it,ek,log=self.log)
                         if i<len(new)-1: time.sleep(SUMMARY_DELAY)
                     self.log(f"\n  Total: {tot} rows")
+                # Financial reports
+                if self.running:
+                    self.log("━"*50); self.log("FINANCIAL REPORTS..."); self.log("━"*50); self._ss("Financial reports...")
+                    fr_items=fetch_financial_reports(log=self.log)
+                    if fr_items:
+                        fr_added=0
+                        for it in fr_items:
+                            if not self.running: break
+                            try: fr_added+=process_financial_report(self.gm,it,ek,log=self.log)
+                            except Exception as e: self.log(f"    ✗ {e}")
+                        self.log(f"  Financial reports: {fr_added} added")
                 if self.running: fix_old_summaries(self.gm,items,log=self.log,running_check=lambda:self.running)
                 self.log("\n"+"═"*50); self.log("✓ ALL DONE!"); self.log("═"*50); self._ss("Complete!")
             except Exception as e: self.log(f"\n✗ {e}"); import traceback; self.log(traceback.format_exc())
