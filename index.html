@@ -351,7 +351,10 @@ async function fetchData() {
 
 function go() {
   F=D.filter(i=>{
-    if(sel!=="ALL"&&i.g!==sel)return false;
+    if(sel!=="ALL"){
+      if(sel==="SplitsRights"){ if(i.g!=="Splits"&&i.g!=="Rights Issue")return false; }
+      else if(i.g!==sel)return false;
+    }
     if(q){const s=q.toLowerCase();return i.co.toLowerCase().includes(s)||i.sm.toLowerCase().includes(s)||i.ds.toLowerCase().includes(s)}
     return true;
   });
@@ -409,13 +412,14 @@ function draw() {
 
 function tabs() {
   const c=gc();
-  const t=[{l:"Dividends",k:"Dividends",e:"💰"},{l:"Financials",k:"Financials",e:"📊"},{l:"Dealings",k:"Dealings",e:"🔄"},{l:"Splits",k:"Splits",e:"✂️"}];
+  const t=[{l:"Dividends",k:"Dividends",e:"💰"},{l:"Financials",k:"Financials",e:"📊"},{l:"Dealings",k:"Dealings",e:"🔄"},{l:"Splits/Rights",k:"SplitsRights",e:"✂️"}];
   let h=`<div class="navbar"><div class="navbar-inner">`;
   t.forEach(f=>{
     const on=sel===f.k;
+    const n=f.k==="SplitsRights"?((c["Splits"]||0)+(c["Rights Issue"]||0)):(c[f.k]||0);
     h+=`<button class="tab${on?" on":""}" onclick="sel=sel==='${f.k}'?'ALL':'${f.k}';go()">
       <div class="tab-icon">${f.e}</div>
-      <div class="tab-num">${c[f.k]||0}</div>
+      <div class="tab-num">${n}</div>
       <div class="tab-label">${f.l}</div>
     </button>`;
   });
