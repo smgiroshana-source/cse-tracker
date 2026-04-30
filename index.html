@@ -240,7 +240,7 @@ const G = {
   "Rights Issue":  { e:"📈", m:s=>s.includes("RIGHTS ISSUE") },
   "Splits":        { e:"✂️", m:s=>s.includes("SPLIT") || s.includes("SUB DIVISION") || s.includes("SUB-DIVISION") },
   "Restructuring": { e:"👥", m:s=>["APPOINTMENT","RESIGNATION","RETIREMENT","REMOVAL","DEATH"].some(k=>s.includes(k)) },
-  "Financials":    { e:"📊", m:s=>["FINANCIAL STATEMENT","ANNUAL REPORT","QUARTERLY","INTERIM","AUDITED"].some(k=>s.includes(k)) },
+  "Financials":    { e:"📊", m:s=>!s.includes("ERRATA")&&["FINANCIAL STATEMENT","ANNUAL REPORT","QUARTERLY FINANCIAL","INTERIM FINANCIAL","AUDITED FINANCIAL"].some(k=>s.includes(k)) },
   "Other":         { e:"📋", m:s=>true },
 };
 function grp(s) { s=(s||"").toUpperCase(); for(const[n,c]of Object.entries(G)){if(n!=="Other"&&c.m(s))return n} return "Other" }
